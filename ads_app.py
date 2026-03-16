@@ -7,9 +7,8 @@ import os
 # --- 1. CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Dashboard ADS - Demo Portafolio", layout="wide")
 
-# --- 2. CONFIGURACIÓN DE ASSETS (Rutas del Original) ---
+# --- 2. CONFIGURACIÓN DE ASSETS ---
 dir_actual = os.path.dirname(__file__)
-# Usamos 'assets' para mantener la estructura de tu carpeta de producción
 PATH_ASSETS = os.path.join(dir_actual, "assets")
 
 logos = {
@@ -23,13 +22,11 @@ logos = {
 
 FONT_LABEL = dict(size=11, family="Arial")
 
-# --- 3. FUNCIONES DE APOYO Y SIMULACIÓN ---
+# --- 3. FUNCIONES DE APOYO (DATOS ALEATORIOS) ---
 def fmt_moneda(valor):
-    """Formato de moneda estilo contable Argentina"""
     return f"${valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 def generar_datos_ficticios(lista_campanas, solo_google=False):
-    """Genera un DataFrame con datos aleatorios para la demo"""
     data = []
     for camp in lista_campanas:
         inv_g = np.random.uniform(80000, 250000)
@@ -46,7 +43,7 @@ def generar_datos_ficticios(lista_campanas, solo_google=False):
         })
     return pd.DataFrame(data)
 
-# --- 4. COMPONENTES DE INTERFAZ ---
+# --- 4. COMPONENTES VISUALES ---
 def mostrar_encabezado_principal():
     st.write("")
     c1, c2, c3 = st.columns(3)
@@ -55,15 +52,13 @@ def mostrar_encabezado_principal():
         with col:
             ruta = logos.get(nombre)
             if ruta and os.path.exists(ruta):
-                st.image(ruta, width=180)
-            else:
-                st.subheader(nombre)
+                try: st.image(ruta, width=180)
+                except: st.subheader(nombre)
+            else: st.subheader(nombre)
     st.write("")
 
 def renderizar_bloque_marca_demo(nombre_marca, logo_key, campanas, ocultar_fb=False):
-    """Renderiza la estructura completa: Logo/Título -> KPIs -> Tabla -> Gráficos"""
-    
-    # Header de Sección
+    # Header: Logo + Título
     col_l, col_t = st.columns([0.07, 0.93])
     with col_l:
         ruta_logo = logos.get(logo_key)
@@ -72,96 +67,73 @@ def renderizar_bloque_marca_demo(nombre_marca, logo_key, campanas, ocultar_fb=Fa
     with col_t:
         st.markdown(f"## {nombre_marca}")
 
-    # Datos Aleatorios
     df = generar_datos_ficticios(campanas, solo_google=ocultar_fb)
     
-    # Métricas (KPIs)
+    # KPIs
     inv_t = df["Inversión Total"].sum()
     vnt_t = df["Total Ventas"].sum()
     cpv_a = inv_t / vnt_t if vnt_t > 0 else 0
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("Inversión Total", fmt_moneda(inv_t), delta=f"Proy: {fmt_moneda(inv_t * 1.15)}")
-    k2.metric("Ventas Total", f"{int(vnt_t)}", delta=f"Proy: {int(vnt_t * 1.15)}")
+    k1.metric("Inversión Total", fmt_moneda(inv_t), delta="Proy: +15%")
+    k2.metric("Ventas Total", f"{int(vnt_t)}", delta="Proy: +8%")
     k3.metric("CPV Acumulado", fmt_moneda(cpv_a))
     
-    # Tabla de Detalle (Estilo Producción)
+    # Tabla Detalle
     st.write("📋 **Detalle de Campañas**")
-    st.dataframe(df.style.background_gradient(cmap='RdYlGn_r', subset=['CPV Acumulado', 'Inversión Total']).format({
+    st.dataframe(df.style.background_gradient(cmap='RdYlGn_r', subset=['CPV Acumulado']).format({
         'Inversión Google': '${:,.2f}', 'Inversión Facebook': '${:,.2f}', 
         'Inversión Total': '${:,.2f}', 'Total Ventas': '{:,.0f}', 'CPV Acumulado': '${:,.2f}'
     }, decimal=',', thousands='.'), use_container_width=True, hide_index=True)
 
-    # Gráficos (Estructura: 1 Arriba, 2 Abajo)
+    # Bloque de 3 Gráficos (1 arriba, 2 abajo)
     st.write("📊 **Rendimiento Visual**")
     
-    # 1. Gráfico de Inversión (Ancho total)
+    # Gráfico 1: Inversión (Ancho total)
     y_graf = ['Inversión Google'] if ocultar_fb else ['Inversión Google', 'Inversión Facebook']
     fig_inv = px.bar(df, x='Campaña', y=y_graf, title="Distribución de Inversión", 
-                     barmode='stack', template="plotly_dark", height=400)
-    fig_inv.update_layout(separators=',.', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                     barmode='stack', template="plotly_dark", height=350)
+    fig_inv.update_layout(separators=',.', legend=dict(orientation="h", y=1.1, x=1, xanchor="right"))
     st.plotly_chart(fig_inv, use_container_width=True)
 
-    # 2. Fila inferior de gráficos
+    # Gráficos 2 y 3: Ventas y CPV (Lado a lado)
     g1, g2 = st.columns(2)
     with g1:
         fig_v = px.bar(df, x='Campaña', y='Total Ventas', title="Ventas por Campaña", text='Total Ventas', template="plotly_dark")
         fig_v.update_traces(textposition='outside', textfont=FONT_LABEL)
         st.plotly_chart(fig_v, use_container_width=True)
-
     with g2:
         fig_c = px.bar(df, x='Campaña', y='CPV Acumulado', title="CPV por Campaña", text='CPV Acumulado', template="plotly_dark", color_discrete_sequence=['#d62728'])
         fig_c.update_traces(texttemplate='$%{text:,.2f}', textposition='outside', textfont=FONT_LABEL)
         st.plotly_chart(fig_c, use_container_width=True)
     
-    st.markdown("<hr style='border: 1.2px solid #555; margin: 25px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='border: 1px solid #444; margin: 30px 0;'>", unsafe_allow_html=True)
 
-# --- 5. EJECUCIÓN PRINCIPAL ---
+# --- 5. RENDERIZADO ---
 mostrar_encabezado_principal()
 
 tab1, tab2 = st.tabs(["📊 Consolidado General", "🎯 Detalle por Cuenta"])
 
 with tab1:
-    # Simulación de las secciones del original
-    renderizar_bloque_marca_demo(
-        "Directv", "DirectTV", 
-        ["AR_Search_Broad", "AR_Performance_Max", "UY_Search_Brand", "CL_Generic_Video", "CO_Display_Remessaging"]
-    )
-    
-    renderizar_bloque_marca_demo(
-        "Prosegur", "Prosegur", 
-        ["AR_Alarmas_Pyme", "AR_Alarmas_Residencial", "UY_Alarmas_Smart"], 
-        ocultar_fb=True
-    )
-    
-    renderizar_bloque_marca_demo(
-        "Claro", "Claro", 
-        ["UY_Portabilidad_Google", "UY_Fibra_Optica_Google"], 
-        ocultar_fb=True
-    )
+    # Secciones con datos aleatorios
+    renderizar_bloque_marca_demo("Directv", "DirectTV", ["AR_Search", "AR_PMax", "UY_Search", "CL_Generic"])
+    renderizar_bloque_marca_demo("Prosegur", "Prosegur", ["Alarmas_Residencial", "Alarmas_Pyme"], ocultar_fb=True)
+    renderizar_bloque_marca_demo("Claro", "Claro", ["Portabilidad_UY", "Fibra_UY"], ocultar_fb=True)
 
 with tab2:
-    st.sidebar.title("Configuración Demo")
-    cuenta_mock = st.sidebar.selectbox("Seleccione Cuenta (Simulación)", [
-        "Google_Directv_Ar", "Facebook_Directv_Ar", "Google_Prosegur_Arg", "Google_Claro_Uru"
-    ])
+    st.title("🎯 Detalle Específico")
+    st.info("Seleccione una cuenta en la barra lateral para simular el análisis.")
     
-    st.title(f"🎯 Rendimiento: {cuenta_mock}")
+    # Sidebar para la pestaña 2
+    cuenta_sel = st.sidebar.selectbox("Cuenta Demo", ["Google_Directv_Ar", "Facebook_Directv_Ar", "Google_Prosegur_Arg"])
     
-    # Simulación de datos diarios (30 días)
-    dias = [f"Día {i}" for i in range(1, 31)]
-    df_diario = pd.DataFrame({
-        'Día': dias,
-        'Coste': np.random.uniform(5000, 15000, 30),
-        'Total Ventas': np.random.randint(1, 10, 30),
-        'Total Leeds': np.random.randint(10, 50, 30)
+    st.subheader(f"Análisis para: {cuenta_sel}")
+    
+    # Simulación simple de tabla diaria
+    dias = pd.date_range(start='2024-01-01', periods=10).strftime('%d/%m/%Y')
+    df_mini = pd.DataFrame({
+        'Fecha': dias,
+        'Gasto': np.random.uniform(5000, 15000, 10),
+        'Ventas': np.random.randint(1, 10, 10)
     })
-    df_diario['CPV'] = df_diario['Coste'] / df_diario['Total Ventas']
-    
-    st.subheader("📅 Detalle Diario Simulado")
-    st.dataframe(df_diario.style.format({
-        'Coste': '${:,.2f}', 'CPV': '${:,.2f}'
-    }, decimal=',', thousands='.'), use_container_width=True, hide_index=True)
-    
-    fig_diario = px.line(df_diario, x='Día', y='Coste', title="Evolución de Gasto Diario", markers=True, template="plotly_dark")
-    st.plotly_chart(fig_diario, use_container_width=True)
+    st.table(df_mini) # Una tabla simple para la pestaña 2
